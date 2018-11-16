@@ -40,7 +40,7 @@ class TicketArticleTwitter < ActiveSupport::TestCase
       truncated: false
     }
     preferences = {
-      twitter: TweetBase.preferences_cleanup(twitter_preferences),
+      twitter: TwitterSync.preferences_cleanup(twitter_preferences),
       links: [
         {
           url: 'https://twitter.com/statuses/123',
@@ -56,7 +56,7 @@ class TicketArticleTwitter < ActiveSupport::TestCase
       from: '@example',
       body: 'some tweet',
       internal: false,
-      preferences: preferences,
+      preferences: TwitterSync.preferences_cleanup(preferences),
       updated_by_id: 1,
       created_by_id: 1,
     )
@@ -79,7 +79,7 @@ class TicketArticleTwitter < ActiveSupport::TestCase
       favorited: false,
       truncated: false
     }
-    preferences = TweetBase.preferences_cleanup(
+    preferences = TwitterSync.preferences_cleanup(
       twitter: twitter_preferences,
       links: [
         {
@@ -96,7 +96,7 @@ class TicketArticleTwitter < ActiveSupport::TestCase
       from: '@example',
       body: 'some tweet',
       internal: false,
-      preferences: preferences,
+      preferences: TwitterSync.preferences_cleanup(preferences),
       updated_by_id: 1,
       created_by_id: 1,
     )
@@ -120,7 +120,7 @@ class TicketArticleTwitter < ActiveSupport::TestCase
       truncated: false
     }
     preferences = {
-      twitter: TweetBase.preferences_cleanup(twitter_preferences),
+      twitter: TwitterSync.preferences_cleanup(twitter_preferences),
       links: [
         {
           url: 'https://twitter.com/statuses/123',
@@ -160,7 +160,7 @@ class TicketArticleTwitter < ActiveSupport::TestCase
       favorited: false,
       truncated: false
     }
-    preferences = TweetBase.preferences_cleanup(
+    preferences = TwitterSync.preferences_cleanup(
       twitter: twitter_preferences,
       links: [
         {

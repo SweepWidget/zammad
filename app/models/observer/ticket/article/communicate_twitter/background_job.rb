@@ -36,20 +36,27 @@ class Observer::Ticket::Article::CommunicateTwitter::BackgroundJob
     # fill article with tweet info
 
     # direct message
-    if tweet.class == Twitter::DirectMessage
-      article.from = "@#{tweet.sender.screen_name}"
-      article.to = "@#{tweet.recipient.screen_name}"
+    tweet_id = nil
+    if tweet.is_a?(Hash)
+      tweet_type = 'DirectMessage'
+      tweet_id = tweet[:event][:id].to_s
+      if tweet[:event] && tweet[:event][:type] == 'message_create'
+        #article.from = "@#{tweet.sender.screen_name}"
+        #article.to = "@#{tweet.recipient.screen_name}"
 
-      article.preferences['twitter'] = {
-        created_at: tweet.created_at,
-        recipient_id: tweet.recipient.id,
-        recipient_screen_name: tweet.recipient.screen_name,
-        sender_id: tweet.sender.id,
-        sender_screen_name: tweet.sender.screen_name,
-      }
+        article.preferences['twitter'] = {
+          #created_at: tweet.created_at,
+          recipient_id: tweet[:event][:message_create][:target][:recipient_id],
+          #recipient_screen_name: tweet.recipient.screen_name,
+          sender_id: tweet[:event][:message_create][:sender_id],
+          #sender_screen_name: tweet.sender.screen_name,
+        }
+      end
 
     # regular tweet
     elsif tweet.class == Twitter::Tweet
+      tweet_type = 'Tweet'
+      tweet_id = tweet.id.to_s
       article.from = "@#{tweet.user.screen_name}"
       if tweet.user_mentions
         to = ''
@@ -62,7 +69,7 @@ class Observer::Ticket::Article::CommunicateTwitter::BackgroundJob
           mention_ids.push user.id
         end
         article.to = to
-        article.preferences['twitter'] = TweetBase.preferences_cleanup(
+        article.preferences['twitter'] = TwitterSync.preferences_cleanup(
           mention_ids: mention_ids,
           geo: tweet.geo,
           retweeted: tweet.retweeted?,
@@ -85,10 +92,10 @@ class Observer::Ticket::Article::CommunicateTwitter::BackgroundJob
     article.preferences['delivery_status'] = 'success'
     article.preferences['delivery_status_date'] = Time.zone.now
 
-    article.message_id = tweet.id.to_s
+    article.message_id = tweet_id
     article.preferences['links'] = [
       {
-        url: "https://twitter.com/statuses/#{tweet.id}",
+        url: "https://twitter.com/statuses/#{tweet_id}",
         target: '_blank',
         name: 'on Twitter',
       },
@@ -96,7 +103,7 @@ class Observer::Ticket::Article::CommunicateTwitter::BackgroundJob
 
     article.save!
 
-    Rails.logger.info "Send twitter (#{tweet.class}) to: '#{article.to}' (from #{article.from})"
+    Rails.logger.info "Send twitter (#{tweet_type}) to: '#{article.to}' (from #{article.from})"
 
     article
   end
