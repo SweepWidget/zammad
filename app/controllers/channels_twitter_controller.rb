@@ -17,7 +17,7 @@ class ChannelsTwitterController < ApplicationController
     given_signature = request.headers[header_name]
     raise Exceptions::UnprocessableEntity, "Missing '#{header_name}' header" if given_signature.blank?
 
-    calculated_signature = hmac_signature(request.raw_post)
+    calculated_signature = hmac_signature_by_app(request.raw_post)
     raise Exceptions::NotAuthorized if calculated_signature != given_signature
     raise Exceptions::UnprocessableEntity, "Missing 'for_user_id' in payload!" if params[:for_user_id].blank?
 
@@ -34,19 +34,27 @@ class ChannelsTwitterController < ApplicationController
     true
   end
 
-  def hmac_signature(content)
+  def hmac_signature_by_app(content)
     external_credential = ExternalCredential.find_by(name: 'twitter')
     raise Exceptions::UnprocessableEntity, 'No such external_credential \'twitter\'!' if !external_credential
 
-    consumer_secret = external_credential.credentials[:consumer_secret]
-    hashed          = OpenSSL::HMAC.digest('sha256', consumer_secret, content)
-    hashed          = Base64.strict_encode64(hashed)
+    hmac_signature_gen(external_credential.credentials[:consumer_secret], content)
+  end
+
+  def hmac_signature_gen(consumer_secret, content)
+    hashed = OpenSSL::HMAC.digest('sha256', consumer_secret, content)
+    hashed = Base64.strict_encode64(hashed)
     "sha256=#{hashed}"
   end
 
   def webhook_verify
+    external_credential = Cache.get('external_credential_twitter')
+    raise Exceptions::UnprocessableEntity, 'No external_credential in cache!' if external_credential.blank?
+    raise Exceptions::UnprocessableEntity, 'No external_credential[:consumer_secret] in cache!' if external_credential[:consumer_secret].blank?
+    raise Exceptions::UnprocessableEntity, 'No crc_token in verify payload from twitter!' if params['crc_token'].blank?
+
     render json: {
-      response_token: hmac_signature(params['crc_token'])
+      response_token: hmac_signature_gen(external_credential[:consumer_secret], params['crc_token'])
     }
   end
 

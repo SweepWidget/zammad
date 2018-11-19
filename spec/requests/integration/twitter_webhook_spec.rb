@@ -48,6 +48,8 @@ RSpec.describe 'Integration Twitter Webhook', type: :request do
   describe 'request verify' do
 
     it 'does check' do
+      Cache.write('external_credential_twitter', @external_credential.credentials)
+      @external_credential.destroy
       params = {
         crc_token: 'some_random',
         nonce: 'some_nonce',

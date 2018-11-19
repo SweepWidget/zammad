@@ -78,12 +78,12 @@ RSpec.describe 'ExternalCredentials', type: :request do
       expect(json_response).to be_a_kind_of(Hash)
       expect(json_response['error']).to eq('No consumer_key param!')
 
-      post '/api/v1/external_credentials/twitter/app_verify', params: { consumer_key: 123, consumer_secret: 123 }, as: :json
+      post '/api/v1/external_credentials/twitter/app_verify', params: { consumer_key: 123, consumer_secret: 123, oauth_token: 123, oauth_token_secret: 123 }, as: :json
       expect(response).to have_http_status(200)
       expect(json_response).to be_a_kind_of(Hash)
       expect(json_response['error']).to eq('401 Authorization Required')
 
-      create(:external_credential, { name: 'twitter', credentials: { consumer_key: 123, consumer_secret: 123 } })
+      create(:external_credential, { name: 'twitter', credentials: { consumer_key: 123, consumer_secret: 123, oauth_token: 123, oauth_token_secret: 123 } })
 
       post '/api/v1/external_credentials/twitter/app_verify', as: :json
       expect(response).to have_http_status(200)
@@ -118,12 +118,12 @@ RSpec.describe 'ExternalCredentials', type: :request do
       expect(json_response).to be_a_kind_of(Hash)
       expect(json_response['error']).to eq('No twitter app configured!')
 
-      get '/api/v1/external_credentials/twitter/link_account', params: { consumer_key: 123, consumer_secret: 123 }, as: :json
+      get '/api/v1/external_credentials/twitter/link_account', params: { consumer_key: 123, consumer_secret: 123, oauth_token: 123, oauth_token_secret: 123 }, as: :json
       expect(response).to have_http_status(422)
       expect(json_response).to be_a_kind_of(Hash)
       expect(json_response['error']).to eq('No twitter app configured!')
 
-      create(:external_credential, { name: 'twitter', credentials: { consumer_key: 123, consumer_secret: 123 } })
+      create(:external_credential, { name: 'twitter', credentials: { consumer_key: 123, consumer_secret: 123, oauth_token: 123, oauth_token_secret: 123 } })
 
       get '/api/v1/external_credentials/twitter/link_account', as: :json
       expect(response).to have_http_status(500)

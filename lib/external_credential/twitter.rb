@@ -121,7 +121,12 @@ class ExternalCredential::Twitter
   end
 
   def self.register_webhook(params)
-    result = request_account_to_link(params, false)
+    request_account_to_link(params, false)
+
+    raise Exceptions::UnprocessableEntity, 'No consumer_key param!' if params[:consumer_key].blank?
+    raise Exceptions::UnprocessableEntity, 'No consumer_secret param!' if params[:consumer_secret].blank?
+    raise Exceptions::UnprocessableEntity, 'No oauth_token param!' if params[:oauth_token].blank?
+    raise Exceptions::UnprocessableEntity, 'No oauth_token_secret param!' if params[:oauth_token_secret].blank?
 
     return if params[:env].blank?
 
@@ -134,10 +139,23 @@ class ExternalCredential::Twitter
       access_token_secret: params[:oauth_token_secret],
     )
 
+    # needed for verify callback
+    Cache.write('external_credential_twitter', {
+                  consumer_key: params[:consumer_key],
+                  consumer_secret: params[:consumer_secret],
+                  access_token: params[:oauth_token],
+                  access_token_secret: params[:oauth_token_secret],
+                })
+
     begin
       webhooks = Twitter::REST::Request.new(client, :get, "/1.1/account_activity/all/#{env_name}/webhooks.json", {}).perform
     rescue => e
-      raise "Unable to get list of webooks. Maybe you do not have an Twitter developer approval right now: #{e.message}"
+      begin
+        webhooks = Twitter::REST::Request.new(client, :get, '/1.1/account_activity/all/webhooks.json', {}).perform
+        raise "Unable to get list of webooks. You use the wrong 'Dev environment label', only #{webhooks.inspect} available."
+      rescue => e
+        raise "Unable to get list of webooks. Maybe you do not have an Twitter developer approval right now or you use the wrong 'Dev environment label': #{e.message}"
+      end
     end
     webhook_id = nil
     webhooks.each do |webhook|
@@ -163,8 +181,8 @@ class ExternalCredential::Twitter
     }
     begin
       response = Twitter::REST::Request.new(client, :post, "/1.1/account_activity/all/#{env_name}/webhooks.json", options).perform
-    rescue
-      message = 'Unable to register webhook.'
+    rescue => e
+      message = "Unable to register webhook: #{e.message}"
       if %r{http://}.match?(webhook_url)
         message += ' Only https webhooks possible to register.'
       elsif webhooks.count.positive?
