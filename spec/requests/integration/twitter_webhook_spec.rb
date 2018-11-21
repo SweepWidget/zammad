@@ -118,6 +118,7 @@ RSpec.describe 'Integration Twitter Webhook', type: :request do
       expect(article.created_by.login).to eq('zammadhq')
       expect(article.created_by.firstname).to eq('Zammad')
       expect(article.created_by.lastname).to eq('Hq')
+      expect(article.attachments.count).to eq(0)
 
       ticket = article.ticket
       expect(ticket.title).to eq('Hey! Hello!')
@@ -136,9 +137,12 @@ RSpec.describe 'Integration Twitter Webhook', type: :request do
       expect(article).to be_present
       expect(article.to).to eq('@zammadhq')
       expect(article.from).to eq('@medenhofer')
+      expect(article.body).to eq("Hello Zammad #zammad @znuny\n\nYeah! https://twitter.com/messages/media/1063077238797725700")
       expect(article.created_by.login).to eq('medenhofer')
       expect(article.created_by.firstname).to eq('Martin')
       expect(article.created_by.lastname).to eq('Edenhofer')
+      expect(article.attachments.count).to eq(0)
+
       ticket = article.ticket
       expect(ticket.title).to eq('Hello Zammad #zammad @znuny  Yeah! https://t.co/UfaCwi9cUb')
       expect(ticket.state.name).to eq('new')
@@ -153,10 +157,13 @@ RSpec.describe 'Integration Twitter Webhook', type: :request do
       expect(article).to be_present
       expect(article.to).to eq('@zammadhq')
       expect(article.from).to eq('@medenhofer')
+      expect(article.body).to eq('Hello again!')
       expect(article.created_by.login).to eq('medenhofer')
       expect(article.created_by.firstname).to eq('Martin')
       expect(article.created_by.lastname).to eq('Edenhofer')
       expect(article.ticket.id).to eq(ticket.id)
+      expect(article.attachments.count).to eq(0)
+
       ticket = article.ticket
       expect(ticket.title).to eq('Hello Zammad #zammad @znuny  Yeah! https://t.co/UfaCwi9cUb')
       expect(ticket.state.name).to eq('new')
@@ -189,9 +196,12 @@ RSpec.describe 'Integration Twitter Webhook', type: :request do
       expect(article).to be_present
       expect(article.from).to eq('@zammadhq')
       expect(article.to).to eq('@medenhofer')
+      expect(article.body).to eq('Hey @medenhofer !  #hello1234 https://twitter.com/zammadhq/status/1063212927510081536/photo/1')
       expect(article.created_by.login).to eq('zammadhq')
       expect(article.created_by.firstname).to eq('Zammad')
       expect(article.created_by.lastname).to eq('Hq')
+      expect(article.attachments.count).to eq(1)
+      expect(article.attachments[0].filename).to eq('DsFKfJRWkAAFEbo.jpg')
 
       ticket = article.ticket
       expect(ticket.title).to eq('Hey @medenhofer !  #hello1234 https://t.co/f1kffFlwpN')
@@ -203,6 +213,35 @@ RSpec.describe 'Integration Twitter Webhook', type: :request do
       expect(ticket.created_by.login).to eq('zammadhq')
       expect(ticket.created_by.firstname).to eq('Zammad')
       expect(ticket.created_by.lastname).to eq('Hq')
+    end
+
+    it 'create new ticket via tweet extended_tweet' do
+      post '/api/v1/channels_twitter_webhook', params: read_messaage('webhook2_tweet'), headers: { 'x-twitter-webhooks-signature' => 'sha256=U7bglX19JitI2xuvyONAc0d/fowIFEeUzkEgnWdGyUM=' }, as: :json
+
+      stub_request(:get, 'http://pbs.twimg.com/media/DsFKfJRWkAAFEbo.jpg')
+        .to_return(status: 200, body: 'some_content')
+
+      expect(response).to have_http_status(200)
+      article = Ticket::Article.find_by(message_id: '1065035365336141825')
+      expect(article).to be_present
+      expect(article.from).to eq('@medenhofer')
+      expect(article.to).to eq('@znuny')
+      expect(article.body).to eq('@znuny Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lore')
+      expect(article.created_by.login).to eq('medenhofer')
+      expect(article.created_by.firstname).to eq('Martin')
+      expect(article.created_by.lastname).to eq('Edenhofer')
+      expect(article.attachments.count).to eq(0)
+
+      ticket = article.ticket
+      expect(ticket.title).to eq('@znuny Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy ...')
+      expect(ticket.state.name).to eq('new')
+      expect(ticket.priority.name).to eq('2 normal')
+      expect(ticket.customer.login).to eq('medenhofer')
+      expect(ticket.customer.firstname).to eq('Martin')
+      expect(ticket.customer.lastname).to eq('Edenhofer')
+      expect(ticket.created_by.login).to eq('medenhofer')
+      expect(ticket.created_by.firstname).to eq('Martin')
+      expect(ticket.created_by.lastname).to eq('Edenhofer')
     end
 
     it 'check duplicate' do

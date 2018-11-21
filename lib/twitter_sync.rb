@@ -191,10 +191,22 @@ class TwitterSync
     article_type = nil
     in_reply_to = nil
     twitter_preferences = {}
+    attachments = []
 
     if item['type'] == 'message_create'
       message_id = item['id']
       text = item['message_create']['message_data']['text']
+      if item['message_create']['message_data']['entities'] && item['message_create']['message_data']['entities']['urls'].present?
+        item['message_create']['message_data']['entities']['urls'].each do |local_url|
+          next if local_url['url'].blank?
+
+          if local_url['expanded_url'].present?
+            text.gsub!(/#{Regexp.quote(local_url['url'])}/, local_url['expanded_url'])
+          elsif local_url['display_url']
+            text.gsub!(/#{Regexp.quote(local_url['url'])}/, local_url['display_url'])
+          end
+        end
+      end
       app = get_app_webhook(item['message_create']['source_app_id'])
       article_type = 'twitter direct-message'
       recipient_screen_name = to_user_webhook_data(item['message_create']['target']['recipient_id'])['screen_name']
@@ -213,19 +225,53 @@ class TwitterSync
     elsif item['text'].present?
       message_id = item['id']
       text = item['text']
+      if item['extended_tweet'] && item['extended_tweet']['full_text'].present?
+        text = item['extended_tweet']['full_text']
+      end
       article_type = 'twitter status'
       sender_screen_name = item['user']['screen_name']
       from = "@#{sender_screen_name}"
       mention_ids = []
-      item['entities']['user_mentions']&.each do |local_user|
-        if !to
-          to = ''
-        else
-          to += ', '
+      if item['entities']
+
+        item['entities']['user_mentions']&.each do |local_user|
+          if !to
+            to = ''
+          else
+            to += ', '
+          end
+          to += "@#{local_user['screen_name']}"
+          mention_ids.push local_user['id']
         end
-        to += "@#{local_user['screen_name']}"
-        mention_ids.push local_user['id']
+
+        item['entities']['media']&.each do |local_media|
+
+          if local_media['url'].present?
+            if local_media['expanded_url'].present?
+              text.gsub!(/#{Regexp.quote(local_media['url'])}/, local_media['expanded_url'])
+            elsif local_media['display_url']
+              text.gsub!(/#{Regexp.quote(local_media['url'])}/, local_media['display_url'])
+            end
+          end
+
+          url = local_media['media_url_https'] || local_media['media_url']
+          next if url.blank?
+
+          result = download_file(url)
+          if !result.success? || !result.body
+            Rails.logger.error "Unable for download image from twitter (#{url}): #{result.code}"
+            next
+          end
+
+          attachment = {
+            filename: url.sub(%r{^.*/(.+?)$}, '\1'),
+            content: result.body,
+
+          }
+          attachments.push attachment
+        end
       end
+
       in_reply_to = item['in_reply_to_status_id']
 
       twitter_preferences = {
@@ -265,7 +311,7 @@ class TwitterSync
       ],
     }
 
-    Ticket::Article.create!(
+    article = Ticket::Article.create!(
       from:        from,
       to:          to,
       body:        text,
@@ -277,6 +323,17 @@ class TwitterSync
       internal:    false,
       preferences: self.class.preferences_cleanup(article_preferences),
     )
+
+    attachments.each do |attachment|
+      Store.add(
+        object: 'Ticket::Article',
+        o_id: article.id,
+        data: attachment[:content],
+        filename: attachment[:filename],
+        preferences: {},
+      )
+    end
+
   end
 
   def to_article(tweet, user, ticket, channel)
@@ -677,6 +734,17 @@ or
     raise 'no users in payload' if !@payload['users'][user_id]
 
     @payload['users'][user_id]
+  end
+
+  def download_file(url)
+    UserAgent.get(
+      url,
+      {},
+      {
+        open_timeout: 20,
+        read_timeout: 40,
+      },
+    )
   end
 
   def to_user_webhook(user_id, payload_user = nil)
